@@ -34,18 +34,7 @@ func (c *cloudInit) CreateConfigFiles() error {
 	}
 
 	// Create cloud config
-	config := cloudConfig{
-		Users: []user{
-			{
-				Name:       c.Config.UserName,
-				Sudo:       "ALL=(ALL) NOPASSWD:ALL",
-				Shell:      "/bin/bash",
-				Password:   c.Config.Password,
-				LockPasswd: false,
-			},
-		},
-		SSHPwauth: true,
-	}
+	config := NewCloudConfig(c.Config)
 
 	// Configurar marshaller para mantener indentación consistente
 	yamlEncoder := yaml.NewEncoder(&bytes.Buffer{})
@@ -70,17 +59,39 @@ func (c *cloudInit) CreateConfigFiles() error {
 	return nil
 }
 
-// writeYAMLFile marshals data to YAML and writes to file
-func (s *cloudInit) writeYAMLFile(filename string, data interface{}) error {
-	// Marshal data to YAML with consistent indentation
+func NewCloudConfig(c Config) cloudConfig {
+	return cloudConfig{
+		Users: []user{
+			{
+				Name:       c.UserName,
+				Sudo:       "ALL=(ALL) NOPASSWD:ALL",
+				Shell:      "/bin/bash",
+				Password:   c.Password,
+				LockPasswd: false,
+			},
+		},
+		SSHPwauth: true,
+	}
+}
+
+// marshalYAML marshals data to YAML with consistent indentation
+func (s *cloudInit) MarshalYAML(data interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	yamlEncoder := yaml.NewEncoder(&buf)
-	yamlEncoder.SetIndent(4)
+	yamlEncoder.SetIndent(2)
 	err := yamlEncoder.Encode(data)
 	if err != nil {
-		return fmt.Errorf("error marshaling YAML: %v", err)
+		return nil, fmt.Errorf("error marshaling YAML: %v", err)
 	}
-	yamlData := buf.Bytes()
+	return buf.Bytes(), nil
+}
+
+// writeYAMLFile marshals data to YAML and writes to file
+func (s *cloudInit) writeYAMLFile(filename string, data interface{}) error {
+	yamlData, err := s.MarshalYAML(data)
+	if err != nil {
+		return err
+	}
 
 	// Write to file
 	filePath := filepath.Join(s.Config.DataDir, filename)

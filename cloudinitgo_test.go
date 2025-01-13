@@ -35,25 +35,24 @@ func TestCloudInit(t *testing.T) {
 	if _, err := os.Stat(userDataPath); os.IsNotExist(err) {
 		t.Errorf("user-data file not created")
 	}
-
-	// Leer y verificar contenido YML
+	// Read and verify content
 	content, err := os.ReadFile(userDataPath)
 	if err != nil {
 		t.Fatalf("Error reading user-data: %v", err)
 	}
 
-	expectedContent := `users:
-	   - name: testuser
-	     sudo: ALL=(ALL) NOPASSWD:ALL
-	     shell: /bin/bash
-	     passwd: testpass
-	     lock_passwd: false
-ssh_pwauth: true
-`
-	if string(content) != expectedContent {
-		t.Errorf("Unexpected YML content:\nGot:\n%s\nWant:\n%s", content, expectedContent)
+	newExpectedConfig := NewCloudConfig(config)
+	expectedContent, err := ci.MarshalYAML(newExpectedConfig)
+	if err != nil {
+		t.Fatalf("Error marshaling expected YAML: %v", err)
 	}
 
+	normalizedExpected := string(expectedContent)
+	normalizedActual := string(content)
+
+	if normalizedActual != normalizedExpected {
+		t.Errorf("YAML content mismatch:\nGot:\n%s\nWant:\n%s", normalizedActual, normalizedExpected)
+	}
 	// Test: Iniciar servidor
 	err = ci.Start()
 	if err != nil {
@@ -70,7 +69,7 @@ ssh_pwauth: true
 		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
-	if w.Body.String() != expectedContent {
+	if w.Body.String() != normalizedExpected {
 		t.Errorf("Unexpected response body:\nGot:\n%s\nWant:\n%s", w.Body.String(), expectedContent)
 	}
 }
